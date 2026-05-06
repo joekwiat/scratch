@@ -1,0 +1,29 @@
+[recent_queries]
+sql = """
+SELECT
+    q.userid,
+    q.starttime,
+    q.endtime,
+    ROUND(DATEDIFF(milliseconds, q.starttime, q.endtime) / 1000.0, 3) AS wall_clock_s,
+    ROUND(COALESCE(w.total_queue_time, 0) / 1000000.0, 3) AS queue_s,
+    ROUND(COALESCE(w.total_exec_time, 0)  / 1000000.0, 3) AS exec_s,
+    q.querytxt,
+    q.aborted
+FROM stl_query q
+LEFT JOIN (
+    SELECT
+        query,
+        userid,
+        MAX(total_queue_time) AS total_queue_time,  -- microseconds
+        MAX(total_exec_time)  AS total_exec_time    -- microseconds
+    FROM stl_wlm_query
+    WHERE queue_start_time >= DATEADD(hour, -1, GETDATE())
+    GROUP BY 1,2
+) w
+    ON w.query = q.query
+   AND w.userid = q.userid
+WHERE q.userid > 1
+  AND q.endtime IS NOT NULL
+ORDER BY exec_s DESC
+LIMIT 50000;
+"""
